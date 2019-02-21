@@ -1,0 +1,12 @@
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\BaboonChecker\ConsoleApp1\bin\Debug\ConsoleApp1.exe.config
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\BaboonChecker\ConsoleApp1\bin\Debug\ConsoleApp1.exe
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\BaboonChecker\ConsoleApp1\bin\Debug\ConsoleApp1.pdb
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\BaboonChecker\ConsoleApp1\obj\Debug\ConsoleApp1.csproj.CoreCompileInputs.cache
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\BaboonChecker\ConsoleApp1\obj\Debug\ConsoleApp1.exe
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\BaboonChecker\ConsoleApp1\obj\Debug\ConsoleApp1.pdb
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\Assignment 6\BaboonChecker\ConsoleApp1\bin\Debug\ConsoleApp1.exe.config
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\Assignment 6\BaboonChecker\ConsoleApp1\bin\Debug\ConsoleApp1.exe
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\Assignment 6\BaboonChecker\ConsoleApp1\bin\Debug\ConsoleApp1.pdb
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\Assignment 6\BaboonChecker\ConsoleApp1\obj\Debug\ConsoleApp1.csproj.CoreCompileInputs.cache
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\Assignment 6\BaboonChecker\ConsoleApp1\obj\Debug\ConsoleApp1.exe
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\Assignment 6\BaboonChecker\ConsoleApp1\obj\Debug\ConsoleApp1.pdb

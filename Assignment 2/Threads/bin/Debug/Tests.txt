@@ -1,0 +1,7 @@
+https://www.youtube.com/
+https://weather.com/weather/tenday/l/Portsmouth+OH+45662:4:US
+https://stackoverflow.com/questions/2887924/invalid-uri-the-format-of-the-uri-could-not-be-determined
+https://docs.microsoft.com/en-us/dotnet/api/system.string.split?view=netframework-4.7.2
+https://social.msdn.microsoft.com/Forums/en-US/f1157782-772f-4db3-bed7-d3cd99300d11/how-could-i-run-a-project-with-some-parameters-in-visual-studio?forum=vstsstart
+https://docs.microsoft.com/en-us/dotnet/api/system.threading.thread?view=netframework-4.7.2
+https://social.msdn.microsoft.com/Forums/en-US/c54db21c-3330-4dbf-a29f-d40bd6db3fd6/an-object-reference-is-required-for-the-nonstatic-field-method-or-property-member?forum=csharplanguage

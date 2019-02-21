@@ -1,0 +1,7 @@
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\Assignment 6\Baboon Problem\obj\Debug\Baboon Problem.csprojAssemblyReference.cache
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\Assignment 6\Baboon Problem\obj\Debug\Baboon Problem.csproj.CoreCompileInputs.cache
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\Assignment 6\Baboon Problem\bin\Debug\Baboon Problem.exe.config
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\Assignment 6\Baboon Problem\bin\Debug\Baboon Problem.exe
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\Assignment 6\Baboon Problem\bin\Debug\Baboon Problem.pdb
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\Assignment 6\Baboon Problem\obj\Debug\Baboon Problem.exe
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\Assignment 6\Baboon Problem\obj\Debug\Baboon Problem.pdb

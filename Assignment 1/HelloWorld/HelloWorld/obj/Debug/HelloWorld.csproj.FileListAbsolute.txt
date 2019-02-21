@@ -1,0 +1,7 @@
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\Assignment 1\HelloWorld\HelloWorld\bin\Debug\HelloWorld.exe.config
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\Assignment 1\HelloWorld\HelloWorld\bin\Debug\HelloWorld.exe
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\Assignment 1\HelloWorld\HelloWorld\bin\Debug\HelloWorld.pdb
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\Assignment 1\HelloWorld\HelloWorld\obj\Debug\HelloWorld.csprojAssemblyReference.cache
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\Assignment 1\HelloWorld\HelloWorld\obj\Debug\HelloWorld.csproj.CoreCompileInputs.cache
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\Assignment 1\HelloWorld\HelloWorld\obj\Debug\HelloWorld.exe
+D:\SchoolAndProjects\Programs\ETEC 3702 OS2\Assignment 1\HelloWorld\HelloWorld\obj\Debug\HelloWorld.pdb
