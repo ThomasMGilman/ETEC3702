@@ -1,0 +1,7 @@
+D:\School\Programs\ETEC 3702 OS2\URLSkimmer\Assignment 9\obj\Debug\Assignment 9.csprojAssemblyReference.cache
+D:\School\Programs\ETEC 3702 OS2\URLSkimmer\Assignment 9\obj\Debug\Assignment 9.csproj.CoreCompileInputs.cache
+D:\School\Programs\ETEC 3702 OS2\URLSkimmer\Assignment 9\bin\Debug\Assignment 9.exe.config
+D:\School\Programs\ETEC 3702 OS2\URLSkimmer\Assignment 9\bin\Debug\Assignment 9.exe
+D:\School\Programs\ETEC 3702 OS2\URLSkimmer\Assignment 9\bin\Debug\Assignment 9.pdb
+D:\School\Programs\ETEC 3702 OS2\URLSkimmer\Assignment 9\obj\Debug\Assignment 9.exe
+D:\School\Programs\ETEC 3702 OS2\URLSkimmer\Assignment 9\obj\Debug\Assignment 9.pdb
