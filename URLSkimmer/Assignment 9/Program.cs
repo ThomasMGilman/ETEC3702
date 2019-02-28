@@ -53,12 +53,16 @@ class Program
                         throw new Exception("Error: Link already added to Dictionary!!! Why is it in Queue!?");
                     attemptedLinks.Add(link.Item1, new Tuple<Uri, int>(link.Item3, link.Item2));
                     currentWorkers++;
-                    Console.WriteLine("Producer Working on: {0}, depth: {1}", link.Item1, link.Item2);
+                    Console.WriteLine("Producer Working on: {0}, depth: {1}", link.Item3.AbsoluteUri, link.Item2);
                 }
 
                 //read the entire document and match all instances of an address to a collention
                 data = File.ReadAllText(link.Item1);
                 MC = URLmatch.Matches(data);
+                lock(Lock)
+                {
+                    Console.WriteLine("num matches: {0}", MC.Count);
+                }
 
                 foreach(Match m in MC)
                 {
@@ -134,11 +138,12 @@ class Program
 
                 Client.DownloadFile(link.Item1.AbsoluteUri, num.ToString());
 
-                if(link.Item2 + 1 < maxDepth)
+                if(link.Item2 < maxDepth)
                 {
                     linkToAdd = new Tuple<string, int, Uri>(num.ToString(), link.Item2, link.Item1);
                     lock(Lock)
                     {
+                        Console.WriteLine("Path: {0} not dead\n", link.Item1.AbsolutePath);
                         producerLinks.Enqueue(linkToAdd);
                         Monitor.PulseAll(Lock);
                     }
@@ -148,8 +153,8 @@ class Program
             {
                 lock (Lock)
                 {
-                    Console.WriteLine("Error Dead Link!! Trying to Read from '{0}'\nException: '{1}'", link.Item1.AbsoluteUri, e.Message);
-                    Console.Read();
+                    Console.WriteLine("Error Dead Link!!Depth: {0} Trying to Read from '{1}'\nException: '{2}'\n", link.Item2, link.Item1.AbsoluteUri, e.Message);
+                    //Console.Read();
                     deadLinks++;
                 }
             }
@@ -222,16 +227,21 @@ class Program
             }
             foreach(Thread t in Threads)
                 t.Join();
-        }
 
-        if(attemptedLinks.Count > 0)
-        {
-            foreach (KeyValuePair<string, Tuple<Uri, int>> key in attemptedLinks)
+            if (attemptedLinks.Count > 0)
             {
-                Console.WriteLine("Visited: {0}\tDepth: {1}\tAbsolutePath: {2}", key.Key, key.Value.Item2, key.Value.Item1.AbsolutePath);
+                Console.WriteLine("number of links visited: {0}\nnumber of deadLinks:{1}", attemptedLinks.Count, deadLinks);
+                foreach (KeyValuePair<string, Tuple<Uri, int>> key in attemptedLinks)
+                {
+                    Console.WriteLine("Visited: {0}\tDepth: {1}\tAbsolutePath: {2}", key.Key, key.Value.Item2, key.Value.Item1.AbsoluteUri);
+                }
             }
         }
+
+        
+        Console.WriteLine("Done");
         Console.Read();
+        
 
     }
 }
