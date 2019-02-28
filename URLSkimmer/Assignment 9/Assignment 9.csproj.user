@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
-    <StartArguments>https://weather.com/%3fcm_ven=PS_GGL_Channel_9102015_1&amp;par=MK_GGL&amp;gclid=CjwKCAiAqt7jBRAcEiwAof2uK4vynnJAVI3AGMANBE_dW5ypbX1oaRPTfjM49xLkus_WOCwOKrHPDxoCbXIQAvD_BwE 2</StartArguments>
+    <StartArguments>https://weather.com/ 2</StartArguments>
   </PropertyGroup>
 </Project>
