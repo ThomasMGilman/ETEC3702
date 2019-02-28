@@ -12,6 +12,7 @@ class Program
     {
         public Uri link;
         public Uri origin;
+        public Exception exception;
         public int depth;
     }
 
@@ -30,7 +31,8 @@ class Program
 
     public static void Producer()
     {
-        string regMatch = "<\\s*a\\s+[^>]*href\\s*=\\s*['\"][^'\"]*['\"]";
+        //string regMatch = "<\\s*a\\s+[^>]*href\\s*=\\s*['\"][^'\"]*['\"]";
+        string regMatch = "href\\s*=\\s*(?:[\"'](?<1>[^\"']*)[\"']|(?<1>\\S+))"; //this regex is provided on the microsoft C# documentation website
         string data;
         Regex URLmatch = new Regex(regMatch);
         MatchCollection MC;
@@ -59,7 +61,7 @@ class Program
                         throw new Exception("Error: Link already added to Dictionary!!! Why is it in Queue!?");
                     visitedLinks.Add(link.Item2.link.AbsoluteUri, link.Item2);
                     currentWorkers++;
-                    Console.WriteLine("Producer Working on: {0}, depth: {1}", link.Item2.link.AbsoluteUri, link.Item2.depth);
+                    //Console.WriteLine("Producer Working on: {0}, depth: {1}", link.Item2.link.AbsoluteUri, link.Item2.depth);
                 }
 
                 //read the entire document and match all instances of an address to a collention
@@ -93,6 +95,7 @@ class Program
 
                     poison = true;
                     Monitor.PulseAll(Lock);
+                    return;
                 }
             }
             lock (Lock)
@@ -116,29 +119,27 @@ class Program
             {
                 lock (Lock)
                 {
-                    if (clientLinks.Count == 0 && producerLinks.Count == 0 && currentWorkers == 0)
+                    if (clientLinks.Count == 0 && producerLinks.Count == 0 && currentWorkers == 0) //last worker poisons everyone else
                     {
                         poison = true;
                         Monitor.PulseAll(Lock);
                         return;
                     }
-                    while (clientLinks.Count == 0 && poison == false)
+                    while (clientLinks.Count == 0 && poison == false)                               //no work, no poison? wait
                         Monitor.Wait(Lock);
 
-                    if (poison)
-                    {
+                    if (poison)                                                                     //Is there poison to partake of and leave?
                         return;
-                    }
 
-                    linkToTry = clientLinks.Dequeue();
-                    currentWorkers++;
-                    num = fileNum++;
-                    Console.WriteLine("Consumer Working on: {0}, depth: {1}", linkToTry.link.AbsoluteUri, linkToTry.depth);
+                    linkToTry = clientLinks.Dequeue();                                              //no snack, just work, get item to work on
+                    currentWorkers++;                                                               //incriment workers
+                    num = fileNum++;                                                                //increment file name for link
+                    //Console.WriteLine("Consumer working on: {0}\nDepth: {1}", linkToTry.link.AbsoluteUri, linkToTry.depth);
                 }
 
-                Client.DownloadFile(linkToTry.link.AbsoluteUri, num.ToString());
+                Client.DownloadFile(linkToTry.link.AbsoluteUri, num.ToString());                    //Try to download, throws exception if link is dead or doesnt work
 
-                if(linkToTry.depth < maxDepth)
+                if(linkToTry.depth < maxDepth)                                                      //add links file to queue for more work, and wake everyone up
                 {
                     linkToAdd = new Tuple<string, webLink>(num.ToString(), linkToTry);
                     lock(Lock)
@@ -148,12 +149,13 @@ class Program
                     }
                 }
             }
-            catch (Exception e)
+            catch (Exception e)                                                                     //link is dead or doesnt respond, add to deadlinks and incriment death count.
             {
                 lock (Lock)
                 {
                     if(!deadLinks.ContainsKey(linkToTry.link.AbsoluteUri))
                     {
+                        linkToTry.exception = e;
                         deadLinks.Add(linkToTry.link.AbsoluteUri, linkToTry);
                         numDeadLinks++;
                     }
@@ -239,7 +241,7 @@ class Program
                 Console.WriteLine("number of links visited: {0}\nnumber of deadLinks:{1}", visitedLinks.Count, numDeadLinks);
                 foreach (KeyValuePair<string, webLink> key in deadLinks)
                 {
-                    Console.WriteLine("DeadLinkOrigin: {0}\nDeadLink: {1}\nDepth: {2}\n", key.Value.origin, key.Key, key.Value.depth);
+                    Console.WriteLine("DeadLinkOrigin: {0}\nDeadLink: {1}\nDepth: {2}\nException: {3}\n", key.Value.origin, key.Key, key.Value.depth, key.Value.exception.Message);
                 }
             }
         }
