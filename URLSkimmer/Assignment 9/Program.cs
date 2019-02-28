@@ -21,7 +21,7 @@ class Program
 
     public static void Producer()
     {
-        string regMatch = "<\\s*a\\s+[^>]*href\\s*=\\s*['\"][^'\"]['\"]*";
+        string regMatch = "<\\s*a\\s+[^>]*href\\s*=\\s*['\"][^'\"]*['\"]";
         string data;
         Regex URLmatch = new Regex(regMatch);
         MatchCollection MC;
@@ -60,9 +60,13 @@ class Program
                 data = File.ReadAllText(link.Item1);
                 MC = URLmatch.Matches(data);
 
-                foreach(string m in MC)
+                foreach(Match m in MC)
                 {
-                    string address = m.Substring(m.IndexOf('=')+1);             //get the address after the = and href
+                    string address = m.Value.Substring(m.Value.IndexOf('=')+1); //get the address after the = and href
+                    lock (Lock)
+                    {
+                        Console.WriteLine("looking at {0}\naddress: {1}", m.Value, address);
+                    }
                     newLink = new Uri(link.Item3, address.Trim());              //create URI of address using host address as the origin link or root
                     linkToQue = new Tuple<Uri, int>(newLink, link.Item2 + 1);   //add new link to be processed or tried and incriment depth.
 
@@ -77,7 +81,7 @@ class Program
             {
                 lock (Lock)
                 {
-                    Console.WriteLine("Error Trying to Read from '{0}'\nException: '{1}'", link.Item3.AbsolutePath, e.Message);
+                    Console.WriteLine("Error Trying to Read from '{0}'\nException: '{1}'", link.Item3.AbsoluteUri, e.Message);
                     Console.Read();
 
                     producerLinks.Enqueue(null);
@@ -132,7 +136,7 @@ class Program
 
                 if(link.Item2 + 1 < maxDepth)
                 {
-                    linkToAdd = new Tuple<string, int, Uri>(num.ToString(), link.Item2 + 1, link.Item1);
+                    linkToAdd = new Tuple<string, int, Uri>(num.ToString(), link.Item2, link.Item1);
                     lock(Lock)
                     {
                         producerLinks.Enqueue(linkToAdd);
@@ -194,7 +198,7 @@ class Program
             Console.WriteLine("Args0: {0}, Args1: {1}", args[0], args[1]);
             Console.WriteLine("Address: {0}, maxDepth: {1}", rootAddress.AbsoluteUri, maxDepth);
 
-            attemptedLinks    = new Dictionary<string, Tuple<Uri, int>>();
+            attemptedLinks  = new Dictionary<string, Tuple<Uri, int>>();
             clientLinks     = new Queue<Tuple<Uri, int>>();
             producerLinks   = new Queue<Tuple<string, int, Uri>>();
             Threads         = new List<Thread>();
@@ -227,6 +231,7 @@ class Program
                 Console.WriteLine("Visited: {0}\tDepth: {1}\tAbsolutePath: {2}", key.Key, key.Value.Item2, key.Value.Item1.AbsolutePath);
             }
         }
+        Console.Read();
 
     }
 }
