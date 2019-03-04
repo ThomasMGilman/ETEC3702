@@ -1,9 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Text.RegularExpressions;
-using System.Net;
+﻿//Thomas Gilman
+//James Hudson
+//21st February 2019
+//ETEC 3702 OS2
+//Assignment 9 Url Skimmer
+using System;
 using System.IO;
+using System.Net;
+using System.Timers;
+using System.Threading;
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
+
 
 class Program
 {
@@ -22,6 +29,7 @@ class Program
     static Queue<webLink> clientLinks;                  //links to test, should try to download
     static Queue<Tuple<string, webLink>> producerLinks; //links to parse for more links
     static List<Thread> Threads;
+    static System.Timers.Timer onTheClock;              //timer for threads to call to tell user they are still working, should do so every 30seconds
 
     static int maxDepth = 0;
     static int numDeadLinks = 0;
@@ -36,7 +44,7 @@ class Program
         string data;
         Regex URLmatch = new Regex(regMatch);
         MatchCollection MC;
-        Tuple<string, webLink> link = null;
+        Tuple<string, webLink> link = null;         //fileName, weblink struct
         webLink newLink;
         bool poisoned = false;
 
@@ -51,9 +59,7 @@ class Program
                         Monitor.Wait(Lock);
 
                     if (poison)
-                    {
                         return;
-                    }
 
                     link = producerLinks.Dequeue();
 
@@ -90,9 +96,7 @@ class Program
             {
                 lock (Lock)
                 {
-                    Console.WriteLine("Error This shouldnt happen, Trying to Read from '{0}'\nException: '{1}'", link.Item2.link.AbsoluteUri, e.Message);
-                    Console.Read();
-
+                    Console.WriteLine("Error This shouldnt happen, Trying to Read from File:'{0}' for : '{1}'\nException: '{2}'", link.Item1, link.Item2.link.AbsoluteUri, e.Message);
                     poison = true;
                     Monitor.PulseAll(Lock);
                     return;
@@ -169,6 +173,24 @@ class Program
 
     }
 
+    //Timer Elapsed lets user know the application is still working every 30 seconds
+    private static void OnTimedEvent(Object source, ElapsedEventArgs e)
+    {
+        lock(Lock)
+        {
+            Console.WriteLine("Working...\n");
+        }
+    }
+
+    public static void setTimer()
+    {
+        onTheClock              = new System.Timers.Timer(30000);
+        onTheClock.Elapsed      += OnTimedEvent;
+        onTheClock.AutoReset    = true;
+        onTheClock.Enabled      = true;
+    }
+
+    //Print error and Exit if exception on startup
     public static void ErrorMessageExit(string message, Exception e = null)
     {
         Console.Write(message);
@@ -203,25 +225,28 @@ class Program
         {
             if(maxDepth < 0)
                 ErrorMessageExit("Please Input a positive integer for distance!");
-            Console.WriteLine("Args0: {0}, Args1: {1}", args[0], args[1]);
-            Console.WriteLine("Address: {0}, maxDepth: {1}", rootAddress.AbsoluteUri, maxDepth);
+            //Console.WriteLine("Args0: {0}, Args1: {1}", args[0], args[1]);
+            //Console.WriteLine("Address: {0}, maxDepth: {1}", rootAddress.AbsoluteUri, maxDepth);
 
-            visitedLinks    = new Dictionary<string, webLink>();
-            deadLinks       = new Dictionary<string, webLink>();
-            clientLinks     = new Queue<webLink>();
-            producerLinks   = new Queue<Tuple<string, webLink>>();
-            Threads         = new List<Thread>();
-            Lock            = new object();
-            webLink rootLink= new webLink();
+            //INITIALLIZE EVERYTHING
+            visitedLinks        = new Dictionary<string, webLink>();
+            deadLinks           = new Dictionary<string, webLink>();
+            clientLinks         = new Queue<webLink>();
+            producerLinks       = new Queue<Tuple<string, webLink>>();
+            Threads             = new List<Thread>();
+            Lock                = new object();
+            webLink rootLink    = new webLink();
+            setTimer();
+
             numDeadLinks = 0;
             currentWorkers = 0;
             fileNum = 0;
 
             rootLink.link = rootAddress;
             rootLink.depth = 0;
-            
             clientLinks.Enqueue(rootLink);
-            
+
+            Console.WriteLine("Working...\n");
             //create 4 producers and consumers
             for(int t = 0; t < 4; t++)
             {
@@ -233,19 +258,25 @@ class Program
                 Threads.Add(newConsumer);
                 Threads.Add(newProducer);
             }
+            //wait for the work to be done
             foreach(Thread t in Threads)
                 t.Join();
 
+            //get ride of timer
+            onTheClock.Stop();
+            onTheClock.Dispose();
+
+            //print out the bad links
             if (visitedLinks.Count > 0)
             {
-                Console.WriteLine("number of links visited: {0}\nnumber of deadLinks:{1}", visitedLinks.Count, numDeadLinks);
+                
                 foreach (KeyValuePair<string, webLink> key in deadLinks)
                 {
                     Console.WriteLine("DeadLinkOrigin: {0}\nDeadLink: {1}\nDepth: {2}\nException: {3}\n", key.Value.origin, key.Key, key.Value.depth, key.Value.exception.Message);
                 }
+                Console.WriteLine("number of links visited: {0}\nnumber of deadLinks: {1}\n", visitedLinks.Count, numDeadLinks);
             }
         }
-
         
         Console.WriteLine("Done");
         Console.Read();
