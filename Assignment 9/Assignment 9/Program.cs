@@ -48,6 +48,7 @@ class Program
         MatchCollection MC;
         Tuple<string, webLink> link = null;         //fileName, weblink struct
         webLink newLink;
+        Uri newAddress;
         bool poisoned = false;
 
         while(!poisoned)
@@ -87,12 +88,13 @@ class Program
                             if(address.Length > 3)
                                 address = address.Substring(1, address.Length - 2);                 //remove the " " from the address
 
-                            newLink = new webLink();
-                            if (address.StartsWith("http") || address.StartsWith("https"))
-                                newLink.link = new Uri(address);
+                            if (address.Contains(link.Item2.link.Host) || address.StartsWith("http") || address.StartsWith("https"))
+                                newAddress = new Uri(address);
                             else
-                                newLink.link = new Uri(link.Item2.link, address);
+                                newAddress = new Uri(link.Item2.link, address);
 
+                            newLink = new webLink();
+                            newLink.link = newAddress;
                             newLink.origin = link.Item2.link;
                             newLink.depth = link.Item2.depth + 1;
 
@@ -164,11 +166,14 @@ class Program
 
                 if(linkToTry.depth < maxDepth)                                                      //add links file to queue for more work, and wake everyone up
                 {
-                    linkToAdd = new Tuple<string, webLink>(num.ToString(), linkToTry);
-                    lock(Lock)
+                    if(linkToTry.link.Host == linkToTry.origin.Host)
                     {
-                        producerLinks.Enqueue(linkToAdd);
-                        Monitor.PulseAll(Lock);
+                        linkToAdd = new Tuple<string, webLink>(num.ToString(), linkToTry);
+                        lock (Lock)
+                        {
+                            producerLinks.Enqueue(linkToAdd);
+                            Monitor.PulseAll(Lock);
+                        }
                     }
                 }
             }
@@ -290,6 +295,7 @@ class Program
         fileNum = 0;
 
         rootLink.link = rootAddress;
+        rootLink.origin = rootAddress;
         rootLink.depth = 0;
         clientLinks.Enqueue(rootLink);
 
