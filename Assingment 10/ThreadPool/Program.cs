@@ -1,8 +1,8 @@
 ﻿//Thomas Gilman
 //James Hudson
-//21st February 2019
+//14th March 2019
 //ETEC 3702 OS2
-//Assignment 9 Url Skimmer
+//Assignment 10 ThreadPool
 using System;
 using System.IO;
 using System.Net;
