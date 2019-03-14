@@ -8,6 +8,7 @@ using System.IO;
 using System.Net;
 using System.Timers;
 using System.Threading;
+using System.Diagnostics;
 using System.Windows.Forms;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
@@ -30,7 +31,6 @@ class Program
     static Dictionary<string, webLink> quedLinks;
     static Queue<webLink> clientLinks;                  //links to test, should try to download
     static Queue<Tuple<string, webLink>> producerLinks; //links to parse for more links
-    static List<Thread> Threads;
     static System.Timers.Timer onTheClock;              //timer for threads to call to tell user they are still working, should do so every 30seconds
 
     static int maxDepth = 0;
@@ -64,16 +64,22 @@ class Program
             //Check the Queue for contents, else wait or die if poisoned
             lock (Lock)
             {
-                if (poison)
+                if (producerLinks.Count > 0 && !poison)
+                {
+                    link = producerLinks.Dequeue();
+                    if (visitedLinks.ContainsKey(link.Item2.link.AbsoluteUri))
+                    {
+                        PoisonTheWater();
+                        throw new Exception("Error: Link already added to Dictionary!!! Why is it in Queue!?");
+                    }
+                    visitedLinks.Add(link.Item2.link.AbsoluteUri, link.Item2);
+                    currentWorkers++;
+                }
+                else
+                {
+                    PoisonTheWater();
                     return;
-
-                link = producerLinks.Dequeue();
-
-                if (visitedLinks.ContainsKey(link.Item2.link.AbsoluteUri))
-                    throw new Exception("Error: Link already added to Dictionary!!! Why is it in Queue!?");
-                visitedLinks.Add(link.Item2.link.AbsoluteUri, link.Item2);
-                currentWorkers++;
-                //Console.WriteLine("Producer Working on: {0}, depth: {1}", link.Item2.link.AbsoluteUri, link.Item2.depth);
+                }
             }
 
             //read the entire document and match all instances of an address to a collention
@@ -89,29 +95,29 @@ class Program
                     {
                         address = m.Value.Substring(m.Value.IndexOf('=') + 1).Trim();    //get the address after the = and href
                         if (address.Length > 3)
+                        {
                             address = address.Substring(1, address.Length - 2);                 //remove the " " from the address
 
-                        if (address.Contains(link.Item2.link.Host) || address.StartsWith("http") || address.StartsWith("https"))
-                            newAddress = new Uri(address);
-                        else
-                            newAddress = new Uri(link.Item2.link, address);
+                            if (address.Contains(link.Item2.link.Host) || address.StartsWith("http") || address.StartsWith("https"))
+                                newAddress = new Uri(address);
+                            else
+                                newAddress = new Uri(link.Item2.link, address);
 
-                        newLink = new webLink();
-                        newLink.link = newAddress;
-                        newLink.origin = link.Item2.link;
-                        newLink.depth = link.Item2.depth + 1;
+                            newLink = new webLink();
+                            newLink.link = newAddress;
+                            newLink.origin = link.Item2.link;
+                            newLink.depth = link.Item2.depth + 1;
 
-                        lock (Lock)
-                        {
-                            //Console.WriteLine("match address: '{0}'", address);
-                            if (!visitedLinks.ContainsKey(newLink.link.AbsoluteUri) && !deadLinks.ContainsKey(newLink.link.AbsoluteUri) && !quedLinks.ContainsKey(newLink.link.AbsoluteUri))
+                            lock (Lock)
                             {
-                                quedLinks.Add(newLink.link.AbsoluteUri, newLink);
-                                clientLinks.Enqueue(newLink);
-                                ThreadPool.QueueUserWorkItem((si) => Consumer());
+                                if (!visitedLinks.ContainsKey(newLink.link.AbsoluteUri) && !deadLinks.ContainsKey(newLink.link.AbsoluteUri) && !quedLinks.ContainsKey(newLink.link.AbsoluteUri))
+                                {
+                                    quedLinks.Add(newLink.link.AbsoluteUri, newLink);
+                                    clientLinks.Enqueue(newLink);
+                                    ThreadPool.QueueUserWorkItem((si) => Consumer());
+                                }
                             }
                         }
-
                     }
                 }
             }
@@ -120,7 +126,7 @@ class Program
         {
             lock (Lock)
             {
-                Console.WriteLine("Error This shouldnt happen, Trying to Read from File:'{0}' for : '{1}'\nAddress:'{2}', Origin:'{3}'\nException: '{4}'\n"
+                Console.WriteLine("Error!!! This shouldnt happen; Trying to Read from File:'{0}' for : '{1}'\nAddress:'{2}', Origin:'{3}'\nException: '{4}'\n"
                     , link.Item1, link.Item2.link.AbsoluteUri, address, link.Item2.link.AbsoluteUri, e.Message);
                 PoisonTheWater();
                 return;
@@ -148,18 +154,19 @@ class Program
         {
             lock (Lock)
             {
-                if (poison)                                                                     //Is there poison to partake of and leave?
+                if (clientLinks.Count > 0 && !poison)
+                {
+                    linkToTry = clientLinks.Dequeue();                                          //no snack, just work, get item to work on
+                    currentWorkers++;                                                           //incriment workers
+                    num = fileNum++;                                                            //increment file name for link
+                }
+                else
                     return;
-
-                linkToTry = clientLinks.Dequeue();                                              //no snack, just work, get item to work on
-                currentWorkers++;                                                               //incriment workers
-                num = fileNum++;                                                                //increment file name for link
-                                                                                                //Console.WriteLine("Consumer working on: {0}\nDepth: {1}", linkToTry.link.AbsoluteUri, linkToTry.depth);
             }
 
             Client.DownloadFile(linkToTry.link.AbsoluteUri, num.ToString());                    //Try to download, throws exception if link is dead or doesnt work
 
-            if (linkToTry.depth < maxDepth)                                                      //add links file to queue for more work, and wake everyone up
+            if (linkToTry.depth < maxDepth)                                                     //add links file to queue for more work, and wake everyone up
             {
                 if (linkToTry.link.Host == linkToTry.origin.Host)
                 {
@@ -245,8 +252,7 @@ class Program
                 gotDistance = Int32.TryParse(args[1], out maxDepth);
                 if (gotDistance == false)
                 {
-                    maxDepth = 1;
-                    //ErrorMessageExit("Please Input a integer for distance!");
+                    ErrorMessageExit("Please Input a integer for distance!");
                 }
             }
 
@@ -274,30 +280,30 @@ class Program
         }
         if (maxDepth < 0)
             ErrorMessageExit("Please Input a positive integer for distance!");
-        //Console.WriteLine("Args0: {0}, Args1: {1}", args[0], args[1]);
-        //Console.WriteLine("Address: {0}, maxDepth: {1}", rootAddress.AbsoluteUri, maxDepth);
 
         //INITIALLIZE EVERYTHING
-        visitedLinks = new Dictionary<string, webLink>();
-        deadLinks = new Dictionary<string, webLink>();
-        quedLinks = new Dictionary<string, webLink>();
-        clientLinks = new Queue<webLink>();
-        producerLinks = new Queue<Tuple<string, webLink>>();
-        Lock = new object();
-        webLink rootLink = new webLink();
-        setTimer();
+        visitedLinks        = new Dictionary<string, webLink>();
+        deadLinks           = new Dictionary<string, webLink>();
+        quedLinks           = new Dictionary<string, webLink>();
+        clientLinks         = new Queue<webLink>();
+        producerLinks       = new Queue<Tuple<string, webLink>>();
+        Lock                = new object();
+        webLink rootLink    = new webLink();
+        Stopwatch sw        = new Stopwatch();
+        
+        numDeadLinks        = 0;
+        currentWorkers      = 0;
+        fileNum             = 0;
 
-        numDeadLinks = 0;
-        currentWorkers = 0;
-        fileNum = 0;
-
-        rootLink.link = rootAddress;
-        rootLink.origin = rootAddress;
-        rootLink.depth = 0;
+        rootLink.link       = rootAddress;
+        rootLink.origin     = rootAddress;
+        rootLink.depth      = 0;
         clientLinks.Enqueue(rootLink);
+        setTimer();
+        sw.Start();
 
-        Console.WriteLine("Working...\n");
         //start thread pool and wait till finish
+        Console.WriteLine("Working...\n");
         ThreadPool.QueueUserWorkItem((si) => Consumer());
         lock(Lock)
         {
@@ -305,20 +311,23 @@ class Program
                 Monitor.Wait(Lock);
         }
 
-        //get ride of timer
+        //get ride of timer and stop stopwatch
+        sw.Stop();
         onTheClock.Stop();
         onTheClock.Dispose();
 
         //print out the bad links
         if (visitedLinks.Count > 0)
         {
-
             foreach (KeyValuePair<string, webLink> key in deadLinks)
             {
                 Console.WriteLine("DeadLinkOrigin: {0}\nDeadLink: {1}\nDepth: {2}\nException: {3}\n", key.Value.origin, key.Key, key.Value.depth, key.Value.exception.Message);
             }
-            Console.WriteLine("number of links visited: {0}\nnumber of deadLinks: {1}\n", visitedLinks.Count, numDeadLinks);
+            Console.WriteLine("number of links visited: {0}\nnumber of deadLinks: {1}\nElapsedTime: {2}", visitedLinks.Count, numDeadLinks, sw.Elapsed);
         }
+        else
+            Console.WriteLine("No Links Visited, RootAddressGiven: '{0}', DepthGiven: '{1}'", rootAddress, maxDepth);
+
         Console.WriteLine("Done");
         Console.Read();
 
