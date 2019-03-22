@@ -2,7 +2,7 @@
 //James Hudson
 //14th March 2019
 //ETEC 3702 OS2
-//Assignment 10 ThreadPool
+//Assignment 11 ThreadPool_2 GUI
 using System;
 using System.IO;
 using System.Timers;
@@ -14,7 +14,6 @@ using System.Windows.Forms;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
-
 
 class Program : Form
 {
@@ -51,6 +50,26 @@ class Program : Form
             tokenSource.Cancel();
             Monitor.PulseAll(Lock);
         }
+
+        //get ride of timer and stop stopwatch
+        sw.Stop();
+        onTheClock.Stop();
+        onTheClock.Dispose();
+
+        //print out the bad links
+        if (visitedLinks.Count > 0)
+        {
+            foreach (KeyValuePair<string, webLink> key in deadLinks)
+            {
+                Console.WriteLine("DeadLinkOrigin: {0}\nDeadLink: {1}\nDepth: {2}\nException: {3}\n", key.Value.origin, key.Key, key.Value.depth, key.Value.exception);
+            }
+            Console.WriteLine("number of links visited: {0}\nnumber of deadLinks: {1}\nElapsedTime: {2}", visitedLinks.Count, numDeadLinks, sw.Elapsed);
+        }
+        else
+            Console.WriteLine("No Links Visited, RootAddressGiven: '{0}', DepthGiven: '{1}'", rootAddress, maxDepth);
+
+        Console.WriteLine("Done");
+        Environment.Exit(0);
     }
 
     public static void Producer()
@@ -96,6 +115,9 @@ class Program : Form
                 foreach (Match m in MC)
                 {
                     int testEqPos = m.Value.IndexOf('=');
+                    if(tokenSource.IsCancellationRequested)
+                        tokenSource.Token.ThrowIfCancellationRequested();
+
                     if (testEqPos > 0)
                     {
                         address = m.Value.Substring(m.Value.IndexOf('=') + 1).Trim();    //get the address after the = and href
@@ -121,8 +143,7 @@ class Program : Form
                                     {
                                         quedLinks.Add(newLink.link.AbsoluteUri, newLink);
                                         clientLinks.Enqueue(newLink);
-                                        ThreadPool.QueueUserWorkItem((si) => Consumer(), tokenSource.Token);
-                                        //Task.Run(() => Consumer(), tokenSource.Token);
+                                        Task.Run(() => Consumer(), tokenSource.Token);
                                     }
                                 }
                             }
@@ -130,6 +151,11 @@ class Program : Form
                     }
                 }
             }
+        }
+        catch (OperationCanceledException e)
+        {
+            PoisonTheWater();
+            return;
         }
         catch (Exception e)
         {
@@ -175,7 +201,10 @@ class Program : Form
                     return;
             }
 
-            var result = Client.GetAsync(linkToTry.link.AbsoluteUri, tokenSource.Token);        //Try to download, throws exception if link is dead or doesnt work                 
+            var result = Client.GetAsync(linkToTry.link.AbsoluteUri, tokenSource.Token);  //Try to download, throws exception if link is dead or doesnt work            
+            if(tokenSource.IsCancellationRequested)
+                tokenSource.Token.ThrowIfCancellationRequested();
+
             if(result.Result.IsSuccessStatusCode)
             {
                 if (linkToTry.link.IsFile)
@@ -197,7 +226,7 @@ class Program : Form
                         {
                             producerLinks.Enqueue(linkToAdd);
                         }
-                        ThreadPool.QueueUserWorkItem((si) => Producer(), tokenSource.Token);
+                        Task.Run(() => Producer(), tokenSource.Token);
                         //Task.Run(() => Producer(), tokenSource.Token);
                     }
                 }
@@ -214,6 +243,11 @@ class Program : Form
                     }
                 }
             }
+        }
+        catch(OperationCanceledException e)
+        {
+            PoisonTheWater();
+            return;
         }
         catch (Exception e)                                                                     
         {
@@ -338,39 +372,7 @@ class Program : Form
         clientLinks.Enqueue(rootLink);
         setTimer();
 
-        Task winTask = new Task(() => Application.Run(new Program()), tokenSource.Token);
-        winTask.Start();
-
-        //start thread pool and wait till finish
-        Console.WriteLine("Working...\n");
-        sw.Start();
-        Task.Run(() => Consumer(), tokenSource.Token);
-
-        lock (Lock)
-        {
-            while (!poison)
-                Monitor.Wait(Lock);
-        }
-
-        //get ride of timer and stop stopwatch
-        sw.Stop();
-        onTheClock.Stop();
-        onTheClock.Dispose();
-
-        //print out the bad links
-        if (visitedLinks.Count > 0)
-        {
-            foreach (KeyValuePair<string, webLink> key in deadLinks)
-            {
-                Console.WriteLine("DeadLinkOrigin: {0}\nDeadLink: {1}\nDepth: {2}\nException: {3}\n", key.Value.origin, key.Key, key.Value.depth, key.Value.exception);
-            }
-            Console.WriteLine("number of links visited: {0}\nnumber of deadLinks: {1}\nElapsedTime: {2}", visitedLinks.Count, numDeadLinks, sw.Elapsed);
-        }
-        else
-            Console.WriteLine("No Links Visited, RootAddressGiven: '{0}', DepthGiven: '{1}'", rootAddress, maxDepth);
-
-        Console.WriteLine("Done");
-        Console.Read();
+        Application.Run(new Program());
     }
 
     Program()
@@ -385,7 +387,7 @@ class Program : Form
             tokenSource.Cancel();
             lock(Lock)
             {
-                poison = true;
+                PoisonTheWater();
                 Monitor.PulseAll(Lock);
             }
             this.Close();
@@ -393,5 +395,11 @@ class Program : Form
         b.Left      = b.Parent.ClientSize.Width / 2 - b.Width / 2;
         b.Top       = b.Parent.ClientSize.Height / 2 - b.Height / 2;
         this.Show();
+
+        //start thread pool and wait till finish
+        Console.WriteLine("Working...\n");
+        sw.Start();
+        Task.Run(() => Consumer(), tokenSource.Token);
+        return;
     }
 }
