@@ -26,21 +26,42 @@ class Program : Form
     }
 
     static object Lock;
-    static Dictionary<string, webLink> deadLinks;
-    static Dictionary<string, webLink> visitedLinks;
-    static Dictionary<string, webLink> quedLinks;
-    static Queue<webLink> clientLinks;                  //links to test, should try to download
-    static Queue<Tuple<string, webLink>> producerLinks; //links to parse for more links
+    static Dictionary<string, webLink> deadLinks, visitedLinks;
     static System.Timers.Timer onTheClock;              //timer for threads to call to tell user they are still working, should do so every 30seconds
     static CancellationTokenSource tokenSource;
     static Stopwatch sw;
     static Uri rootAddress;
 
-    static int maxDepth = 0;
-    static int numDeadLinks = 0;
-    static int currentWorkers = 0;
-    static int fileNum = 0;
+    static int maxDepth, numDeadLinks, currentWorkers, fileNum;
     static bool poison = false;
+
+    //Timer Elapsed lets user know the application is still working every 30 seconds
+    private static void OnTimedEvent(Object source, ElapsedEventArgs e)
+    {
+        lock (Lock)
+        {
+            Console.WriteLine("Working...\n");
+        }
+    }
+
+    public static void setTimer()
+    {
+        onTheClock = new System.Timers.Timer(30000);
+        onTheClock.Elapsed += OnTimedEvent;
+        onTheClock.AutoReset = true;
+        onTheClock.Enabled = true;
+    }
+
+    //Print error and Exit if exception on startup
+    public static void ErrorMessageExit(string message, Exception e = null)
+    {
+        Console.Write(message);
+        if (e != null)
+            Console.Write(e);
+        Console.WriteLine();
+        Console.Read();
+        Environment.Exit(-1);
+    }
 
     public static void PoisonTheWater()
     {
@@ -72,14 +93,33 @@ class Program : Form
         Environment.Exit(0);
     }
 
-    public static void Producer()
+    public static void startThreadTask(webLink link)
+    {
+        lock (Lock)
+        {
+            currentWorkers++;
+        }
+        Task.Run(() =>
+        {
+            Consumer(link);
+            lock (Lock)
+            {
+                currentWorkers--;
+                if (currentWorkers == 0)    //last worker poisons everyone else
+                {
+                    PoisonTheWater();
+                    return;
+                }
+            }
+        }, tokenSource.Token);
+    }
+
+    public static void Producer(Tuple<string, webLink> link)
     {
         //string regMatch = "<\\s*a\\s+[^>]*href\\s*=\\s*['\"][^'\"]*['\"]";
         string regMatch = "href\\s*=\\s*(?:[\"'](?<1>[^\"']*)[\"']|(?<1>\\S+))"; //this regex is provided on the microsoft C# documentation website
         string data, address = "";
         Regex URLmatch = new Regex(regMatch);
-        MatchCollection MC;
-        Tuple<string, webLink> link = null;         //fileName, weblink struct
         webLink newLink;
         Uri newAddress;
 
@@ -88,64 +128,41 @@ class Program : Form
             //Check the Queue for contents, else wait or die if poisoned
             lock (Lock)
             {
-                if (producerLinks.Count > 0 && !poison)
-                {
-                    link = producerLinks.Dequeue();
-                    if (visitedLinks.ContainsKey(link.Item2.link.AbsoluteUri))
-                    {
-                        PoisonTheWater();
-                        throw new Exception("Error: Link already added to Dictionary!!! Why is it in Queue!?");
-                    }
-                    visitedLinks.Add(link.Item2.link.AbsoluteUri, link.Item2);
-                    currentWorkers++;
-                }
-                else
-                {
-                    PoisonTheWater();
+                if (poison)
                     return;
-                }
             }
 
             //read the entire document and match all instances of an address to a collention
             data = File.ReadAllText(link.Item1);
             if (data.Length > 0)
             {
-                MC = URLmatch.Matches(data);
-
-                foreach (Match m in MC)
+                foreach (Match m in URLmatch.Matches(data))
                 {
-                    int testEqPos = m.Value.IndexOf('=');
-                    if(tokenSource.IsCancellationRequested)
+                    if (tokenSource.IsCancellationRequested)
                         tokenSource.Token.ThrowIfCancellationRequested();
 
-                    if (testEqPos > 0)
+                    int testEqPos = m.Value.IndexOf('=');
+                    address = m.Value.Substring(m.Value.IndexOf('=') + 1).Trim();       //get the address after the = and href
+                    address = address.Substring(1, address.Length - 2);                 //remove the " " from the address
+
+                    if (address.Contains(link.Item2.link.Host) || address.StartsWith("http") || address.StartsWith("https"))
+                        newAddress = new Uri(address);
+                    else
+                        newAddress = new Uri(link.Item2.link, address);
+
+                    if (newAddress.Host == link.Item2.link.Host)
                     {
-                        address = m.Value.Substring(m.Value.IndexOf('=') + 1).Trim();    //get the address after the = and href
-                        if (address.Length > 3)
+                        newLink = new webLink();
+                        newLink.link = newAddress;
+                        newLink.origin = link.Item2.link;
+                        newLink.depth = link.Item2.depth + 1;
+
+                        lock (Lock)
                         {
-                            address = address.Substring(1, address.Length - 2);                 //remove the " " from the address
-
-                            if (address.Contains(link.Item2.link.Host) || address.StartsWith("http") || address.StartsWith("https"))
-                                newAddress = new Uri(address);
-                            else
-                                newAddress = new Uri(link.Item2.link, address);
-
-                            if(newAddress.Host == link.Item2.link.Host)
+                            if (!visitedLinks.ContainsKey(newAddress.AbsoluteUri) && !deadLinks.ContainsKey(newAddress.AbsoluteUri))
                             {
-                                newLink = new webLink();
-                                newLink.link = newAddress;
-                                newLink.origin = link.Item2.link;
-                                newLink.depth = link.Item2.depth + 1;
-
-                                lock (Lock)
-                                {
-                                    if (!visitedLinks.ContainsKey(newLink.link.AbsoluteUri) && !deadLinks.ContainsKey(newLink.link.AbsoluteUri) && !quedLinks.ContainsKey(newLink.link.AbsoluteUri))
-                                    {
-                                        quedLinks.Add(newLink.link.AbsoluteUri, newLink);
-                                        clientLinks.Enqueue(newLink);
-                                        Task.Run(() => Consumer(), tokenSource.Token);
-                                    }
-                                }
+                                visitedLinks.Add(newAddress.AbsoluteUri, newLink);
+                                startThreadTask(newLink);
                             }
                         }
                     }
@@ -167,22 +184,11 @@ class Program : Form
                 return;
             }
         }
-        lock (Lock)
-        {
-            currentWorkers--;
-            if (clientLinks.Count == 0 && producerLinks.Count == 0 && currentWorkers == 0) //last worker poisons everyone else
-            {
-                PoisonTheWater();
-                return;
-            }
-        }
     }
 
-    public static void Consumer()
+    public static void Consumer(webLink linkToTry)
     {
         HttpClient Client = new HttpClient();
-        webLink linkToTry = new webLink();
-        Tuple<string, webLink> linkToAdd = null;
         FileStream newFile;
         int num;
         string FileName;
@@ -191,45 +197,30 @@ class Program : Form
         {
             lock (Lock)
             {
-                if (clientLinks.Count > 0 && !poison)
-                {
-                    linkToTry = clientLinks.Dequeue();                                          //no snack, just work, get item to work on
-                    currentWorkers++;                                                           //incriment workers
-                    num = fileNum++;                                                            //increment file name for link
-                }
-                else
+                if (poison)
                     return;
+
+                num = fileNum++;                                                            //increment file name for link
             }
 
             var result = Client.GetAsync(linkToTry.link.AbsoluteUri, tokenSource.Token);  //Try to download, throws exception if link is dead or doesnt work            
             if(tokenSource.IsCancellationRequested)
                 tokenSource.Token.ThrowIfCancellationRequested();
 
-            if(result.Result.IsSuccessStatusCode)
+            if(result.Result.IsSuccessStatusCode)           //Http connection success
             {
                 if (linkToTry.link.IsFile)
                     FileName = Path.GetFileName(linkToTry.link.LocalPath) + '_' + num.ToString();
                 else
                     FileName = num.ToString();
-                newFile = new FileStream(FileName, FileMode.Append);
+                newFile = new FileStream(FileName, FileMode.Create);
                 byte[] webData = result.Result.Content.ReadAsByteArrayAsync().Result;
 
                 newFile.Write(webData, 0, webData.Length);
                 newFile.Close();
 
-                if (linkToTry.depth < maxDepth)                                                     //add links file to queue for more work, and wake everyone up
-                {
-                    if (linkToTry.link.Host == linkToTry.origin.Host)
-                    {
-                        linkToAdd = new Tuple<string, webLink>(FileName, linkToTry);
-                        lock (Lock)
-                        {
-                            producerLinks.Enqueue(linkToAdd);
-                        }
-                        Task.Run(() => Producer(), tokenSource.Token);
-                        //Task.Run(() => Producer(), tokenSource.Token);
-                    }
-                }
+                if (linkToTry.depth < maxDepth)                                                 //start producing more consumer tasks if maxDepth not reached
+                    Producer(new Tuple<string, webLink>(num.ToString(), linkToTry));
             }
             else                    //link is dead or doesnt respond, add to deadlinks and incriment death count.
             {
@@ -261,44 +252,9 @@ class Program : Form
                 }
             }
         }
-        lock (Lock)
-        {
-            currentWorkers--;
-            if (clientLinks.Count == 0 && producerLinks.Count == 0 && currentWorkers == 0) //last worker poisons everyone else
-            {
-                PoisonTheWater();
-                return;
-            }
-        }
     }
 
-    //Timer Elapsed lets user know the application is still working every 30 seconds
-    private static void OnTimedEvent(Object source, ElapsedEventArgs e)
-    {
-        lock (Lock)
-        {
-            Console.WriteLine("Working...\n");
-        }
-    }
 
-    public static void setTimer()
-    {
-        onTheClock = new System.Timers.Timer(30000);
-        onTheClock.Elapsed += OnTimedEvent;
-        onTheClock.AutoReset = true;
-        onTheClock.Enabled = true;
-    }
-
-    //Print error and Exit if exception on startup
-    public static void ErrorMessageExit(string message, Exception e = null)
-    {
-        Console.Write(message);
-        if (e != null)
-            Console.Write(e);
-        Console.WriteLine();
-        Console.Read();
-        Environment.Exit(-1);
-    }
 
     static void Main(string[] args)
     {
@@ -353,24 +309,14 @@ class Program : Form
         //INITIALLIZE EVERYTHING
         visitedLinks        = new Dictionary<string, webLink>();
         deadLinks           = new Dictionary<string, webLink>();
-        quedLinks           = new Dictionary<string, webLink>();
-        clientLinks         = new Queue<webLink>();
-        producerLinks       = new Queue<Tuple<string, webLink>>();
         Lock                = new object();
-        webLink rootLink    = new webLink();
+        
         sw                  = new Stopwatch();
         tokenSource         = new CancellationTokenSource();
         
         numDeadLinks        = 0;
         currentWorkers      = 0;
         fileNum             = 0;
-
-        rootLink.link       = rootAddress;
-        rootLink.origin     = rootAddress;
-        rootLink.depth      = 0;
-
-        clientLinks.Enqueue(rootLink);
-        setTimer();
 
         Application.Run(new Program());
     }
@@ -396,10 +342,16 @@ class Program : Form
         b.Top       = b.Parent.ClientSize.Height / 2 - b.Height / 2;
         this.Show();
 
+        webLink rootLink = new webLink();
+        rootLink.link = rootAddress;
+        rootLink.origin = rootAddress;
+        rootLink.depth = 0;
+
         //start thread pool and wait till finish
         Console.WriteLine("Working...\n");
+        setTimer();
         sw.Start();
-        Task.Run(() => Consumer(), tokenSource.Token);
+        startThreadTask(rootLink);
         return;
     }
 }

@@ -93,19 +93,22 @@ class Program
                             else
                                 newAddress = new Uri(link.Item2.link, address);
 
-                            newLink = new webLink();
-                            newLink.link = newAddress;
-                            newLink.origin = link.Item2.link;
-                            newLink.depth = link.Item2.depth + 1;
-
-                            lock (Lock)
+                            if (newAddress.Host == link.Item2.link.Host)
                             {
-                                //Console.WriteLine("match address: '{0}'", address);
-                                if (!visitedLinks.ContainsKey(newLink.link.AbsoluteUri) && !deadLinks.ContainsKey(newLink.link.AbsoluteUri) && !quedLinks.ContainsKey(newLink.link.AbsoluteUri))
+                                newLink = new webLink();
+                                newLink.link = newAddress;
+                                newLink.origin = link.Item2.link;
+                                newLink.depth = link.Item2.depth + 1;
+
+                                lock (Lock)
                                 {
-                                    quedLinks.Add(newLink.link.AbsoluteUri, newLink);
-                                    clientLinks.Enqueue(newLink);
-                                    Monitor.PulseAll(Lock);
+                                    //Console.WriteLine("match address: '{0}'", address);
+                                    if (!visitedLinks.ContainsKey(newLink.link.AbsoluteUri) && !deadLinks.ContainsKey(newLink.link.AbsoluteUri) && !quedLinks.ContainsKey(newLink.link.AbsoluteUri))
+                                    {
+                                        quedLinks.Add(newLink.link.AbsoluteUri, newLink);
+                                        clientLinks.Enqueue(newLink);
+                                        Monitor.PulseAll(Lock);
+                                    }
                                 }
                             }
                         }
