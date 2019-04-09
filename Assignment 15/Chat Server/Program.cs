@@ -1,10 +1,13 @@
-﻿using System;
+﻿//Thomas Gilman
+//James Hudson
+//Operating Systems 2
+//serverClient Async 2
+//7th April, 2019
+using System;
 using System.IO;
-using System.Net;
 using System.Net.Sockets;
 using System.Windows.Forms;
 using System.Threading.Tasks;
-using System.Collections.Generic;
 using System.Drawing;
 
 class MainClass : Form
