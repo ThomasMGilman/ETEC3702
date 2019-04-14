@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Numerics;
 using System.Windows.Forms;
 using System.Drawing;
@@ -11,10 +12,13 @@ using System.Threading;
 
 class MainClass : Form
 {
+
     public static void Main(string[] args)
     {
         Application.Run(new MainClass());
     }
+
+    object l = new object();
 
     //gui widgets
     Bitmap img;
@@ -25,7 +29,9 @@ class MainClass : Form
 
     //percent of the way we are through the
     //computation. -1=no computation going on
+    int globalProg = 0;
     int progress = -1;
+    int numProcCount = Environment.ProcessorCount;
 
     //used to periodically update the progress bar.
     //Note that this Timer runs in the GUI thread.
@@ -219,29 +225,24 @@ class MainClass : Form
         }
     }
 
-    public byte[] multiWorkImage(BitmapData bdata)
-    {
-        byte[] data = { };
-
-
-        return data;
-    }
-
     //call compute() to update the fractal image
     //and then copy the data into the bitmap
     async Task computeImage(int w, int h)
     {
         progress = 0;
+        globalProg = 0;
+        int maxiter = 1 << maxiter_;
         var startTime = System.DateTime.Now;
         timer.Start();
-        int maxiter = 1 << maxiter_;
         img = new Bitmap(w, h, PixelFormat.Format24bppRgb);
         var bdata = img.LockBits(new Rectangle(0, 0, img.Width, img.Height),
             ImageLockMode.ReadWrite, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
         img.UnlockBits(bdata);
+        
         var T = Task.Run(() => {
             return compute(bdata.Width, bdata.Height, bdata.Stride, maxiter);
         });
+
         var data = await T;
         bdata = img.LockBits(new Rectangle(0, 0, img.Width, img.Height),
             ImageLockMode.ReadWrite, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
@@ -255,29 +256,41 @@ class MainClass : Form
         progressbar.Value = 0;
     }
 
+
     //this is where the actual Mandelbrot computation takes place.
     byte[] compute(int w, int h, int stride, int maxiter)
     {
         byte[] data = new byte[h * stride];
-        var deltaY = (ymax - ymin) / (double)(h);
-        var deltaX = (xmax - xmin) / (double)(w);
-        int x, y;
-        double px, py;
-        byte[] rgb = new byte[3];
-        for (y = 0, py = ymin; y < h; y++, py += deltaY)
+        double deltaY = (ymax - ymin) / (double)(h);
+        double deltaX = (xmax - xmin) / (double)(w);
+        
+        int chunkSize = h / numProcCount;
+        int progressIncAmount = 100 / numProcCount;
+
+        Parallel.For(0, numProcCount, (i) =>
         {
-            int tmp = 100 * y / h;
-            Interlocked.Exchange(ref progress, tmp);
-            int idx = y * stride;
-            for (x = 0, px = xmin; x < w; x++, px += deltaX)
+            int x, y;
+            double px, py;
+            byte[] rgb = new byte[3];
+
+            int yStart = i * chunkSize;
+            double startPy = (double)yStart * deltaY;
+            int height = i < numProcCount - 1 ? (i + 1) * chunkSize : h;
+            for (y = yStart, py = ymin + startPy; y < height; y++, py += deltaY)
             {
-                int iter = iterationsToInfinity(px, py, maxiter);
-                mapColor(iter, maxiter, rgb);
-                data[idx++] = rgb[0];
-                data[idx++] = rgb[1];
-                data[idx++] = rgb[2];
+                int idx = y * stride;
+                Interlocked.Add(ref globalProg, 1);
+                Interlocked.Exchange(ref progress, 100 * globalProg / h);
+                for (x = 0, px = xmin; x < w; x++, px += deltaX)
+                {
+                    int iter = iterationsToInfinity(px, py, maxiter);
+                    mapColor(iter, maxiter, rgb);
+                    data[idx++] = rgb[0];
+                    data[idx++] = rgb[1];
+                    data[idx++] = rgb[2];
+                }
             }
-        }
+        });
         return data;
     }
 
