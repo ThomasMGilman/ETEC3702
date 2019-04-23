@@ -58,7 +58,7 @@ int main(int argc, char* argv[])
 	}
 	else			//task
 		compute(rank);
-
+	MPI_Finalize();
     return 0;
 }
 
@@ -78,7 +78,9 @@ void splitWork(std::vector<uint8_t>& data, int w, int h, int stride, int maxiter
 		task->miter = maxiter; task->stride = stride;							//set maxiter and stride
 		task->y = (h / numTasks) * i-1;											//set starting x and starting y
 		
-		MPI_Send(&task, sizeof(task), MPI_BYTE, i, 0, MPI_COMM_WORLD);			//send size to work on
+		std::cout << "sending: " << sizeof(int)*5 << std::endl;
+		MPI_Send(&task, sizeof(int)*5, MPI_BYTE, i, 0, MPI_COMM_WORLD);			//send size to work on
+		std::cout << "sent" << std::endl;
 	}
 	std::vector<uint8_t> newData;
 	newData.resize(sizeOfData);
@@ -88,9 +90,10 @@ void splitWork(std::vector<uint8_t>& data, int w, int h, int stride, int maxiter
 		MPI_Status status;
 		int sizeOfData;
 
-		MPI_Probe(0, 0, MPI_COMM_WORLD, &status);
+		MPI_Probe(i, 0, MPI_COMM_WORLD, &status);
 		MPI_Get_count(&status, MPI_BYTE, &sizeOfData);
-		MPI_Recv(msg, sizeOfData, MPI_CHAR, 0, 0, MPI_COMM_WORLD, &status);
+		std::cout << "Recieving" << std::endl;
+		MPI_Recv(msg, sizeOfData, MPI_CHAR, i, 0, MPI_COMM_WORLD, &status);
 	}
 
 	data = newData;
@@ -102,11 +105,13 @@ void splitWork(std::vector<uint8_t>& data, int w, int h, int stride, int maxiter
 //this is where the actual Mandelbrot computation takes place.
 void compute(int rank)
 {
-	std::cout << rank << std::endl;
+	std::cout << rank << " Recieving: "<< sizeof(int) * 5 << std::endl;
 	workLoad task;
 	int sizeOfData;
 	MPI_Status status;
-	MPI_Recv(&task, sizeof(int)*5, MPI_BYTE, rank, 0, MPI_COMM_WORLD, &status);
+	MPI_Recv(&task, sizeof(int)*5, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &status);
+
+	//MPI_Probe(sizeOfData, 0, MPI_COMM_WORLD, &status);
 	std::cout << "got data" << std::endl;
 
 	//std::vector<uint8_t>& data, int w, int h, int stride, int maxiter
