@@ -1,5 +1,11 @@
-﻿using System.Collections.Generic;
-using System.Runtime.InteropServices;
+﻿//Thomas Gilman
+//James Hudson
+//ETEC 3702 01
+//Operating Systems 2
+//30th April, 2019
+//Targa Compression EXAM!!!!
+
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.IO;
 using System;
@@ -96,46 +102,58 @@ class Program
     //ipix = uncompressed data, opix = new data list to compress to
     static void compressIt(Pixel[] ipix, List<byte> opix, TGAHeader hdr)
     {
-        int ipixSize = ipix.Length;
-        //Parallel.For(0, hdr.height, k => {
-        //    int start = k * hdr.width;
-        //    int stop = (k + 1) * hdr.width;
-        //});
+        //int ipixSize = ipix.Length;
+        int maxSize = 0;
+        List<List<byte>> rows = new List<List<byte>>(hdr.height);
+        while (maxSize++ < hdr.height)
+            rows.Add(new List<byte>());
 
-        int i, n;
-        int[] repeats = new int[ipix.Length];
-        for (i = ipixSize - 2; i >= 0; i--)         //accumulate repeats of each pixel in ipix
-        {
-            if (ipix[i] == ipix[i + 1]) repeats[i] = repeats[i + 1] + 1;
-            else repeats[i] = 1;
-        }
+        Parallel.For(0, hdr.height, k => {              //break up tasks by height of image
+            List<byte> row = new List<byte>();          //this rows byte List
+            int start = k * hdr.width;                  //get start index of ipix array
+            int ipixSize = (k + 1) * hdr.width;         //get ending index of ipix array
 
-        i = 0;
-        while(i < ipixSize)                         //Compress Image
-        {
-            int j = i;
-            while (j < ipixSize && repeats[j] < 2)  //find two identical pixels
-                j++;
-            while(i < j)
+            int i, n;
+            int[] repeats = new int[ipixSize];
+            for (i = ipixSize - 2; i >= 0; i--)         //accumulate repeats of each pixel in ipix
             {
-                n = j - i;
-                if (n > 128)
-                    n = 128;
-
-                outputByte(n - 1, ref opix);
-                while(n-- > 0)
-                    outputPixel(ipix[i++], ref opix);
+                if (ipix[i] == ipix[i + 1]) repeats[i] = repeats[i + 1] + 1;
+                else repeats[i] = 1;
             }
 
-            if (i == ipixSize)  //check at end, else guaranteed run of identical pixels
-                break;
+            i = start;
+            while (i < ipixSize)                         //Compress Image
+            {
+                int j = i;
+                while (j < ipixSize && repeats[j] < 2)  //find two identical pixels
+                    j++;
+                while (i < j)
+                {
+                    n = j - i;
+                    if (n > 128)
+                        n = 128;
 
-            n = repeats[i];
-            if (n > 128)
-                n = 128;
-            outputByte(0x80 + (n - 1), ref opix);
-            outputPixel(ipix[i], ref opix);
-            i += n;
+                    outputByte(n - 1, ref row);
+                    while (n-- > 0)
+                        outputPixel(ipix[i++], ref row);
+                }
+
+                if (i == ipixSize)  //check at end, else guaranteed run of identical pixels
+                    break;
+
+                n = repeats[i];
+                if (n > 128)
+                    n = 128;
+                outputByte(0x80 + (n - 1), ref row);
+                outputPixel(ipix[i], ref row);
+                i += n;
+            }
+            rows[k] = row;
+        });
+        foreach(List<byte> row in rows)
+        {
+            foreach (byte pix in row)
+                opix.Add(pix);
         }
     }
 
